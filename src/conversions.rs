@@ -1,13 +1,13 @@
-use chrono::{Datelike, NaiveDate};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use std::f64::consts::PI;
 
 pub fn c_to_f(value: f64) -> f64 {
-    // conversion of celsius to fahrenheit
+    // conversion of Celsius to Fahrenheit
     value * 9.0 / 5.0 + 32.0
 }
 
 pub fn f_to_c(value: f64) -> f64 {
-    // conversion of fahrenheit to celsius
+    // conversion of Fahrenheit to celsius
     (value - 32.0) * 5.0 / 9.0
 }
 
@@ -66,11 +66,7 @@ fn radians_to_degrees(radians: f64) -> f64 {
 ///   - Ok(u32): the day of the year as a u32 if the input date is valid.
 ///   - Err(String): an error string indicating what went wrong (e.g., invalid date format).
 ///
-pub fn day_of_year(date_str: &str) -> Result<u32, String> {
-    // Parse the string into a NaiveDate object
-    let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-        .map_err(|_| "Failed to parse date. Ensure it's in the format yyyy-mm-dd.")?;
-
+pub fn day_of_year(date: &DateTime<Utc>) -> Result<u32, String> {
     // Get the day of the year
     Ok(date.ordinal())
 }
@@ -81,24 +77,18 @@ mod tests {
 
     #[test]
     fn test_day_of_year() {
-        let day_of_year = day_of_year("2023-01-01").unwrap();
+        let naive_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+        let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
+        let day_of_year = day_of_year(&DateTime::from_naive_utc_and_offset(naive_datetime, Utc)).unwrap();
         assert_eq!(day_of_year, 1);
     }
 
     #[test]
     fn test_day_of_year_leap_year() {
-        let day_of_year = day_of_year("2020-02-29").unwrap();
+        let naive_date = NaiveDate::from_ymd_opt(2020, 2, 29).unwrap();
+        let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
+        let day_of_year = day_of_year(&DateTime::from_naive_utc_and_offset(naive_datetime, Utc)).unwrap();
         assert_eq!(day_of_year, 60);
-    }
-
-    #[test]
-    fn test_day_of_year_invalid_date() {
-        let day_of_year = day_of_year("2023-01-32");
-        assert!(day_of_year.is_err());
-        assert_eq!(
-            day_of_year.unwrap_err().to_string(),
-            "Failed to parse date. Ensure it's in the format yyyy-mm-dd."
-        );
     }
 
     #[test]

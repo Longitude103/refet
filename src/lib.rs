@@ -3,8 +3,6 @@ mod eta;
 mod input;
 mod et;
 
-use input::Input;
-
-fn get_input(input: Input) {
-    // Implementation of get_input function
-}
+pub use et::calculate_ref_et;
+pub use input::Input;
+pub use eta::{EaInput, Method};

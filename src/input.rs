@@ -1,4 +1,5 @@
 use std::error::Error;
+use chrono::{DateTime, NaiveDate, Utc};
 use crate::conversions::*;
 use crate::eta::EaInput;
 
@@ -6,73 +7,161 @@ pub struct Input {
     tmax: Value,
     tmin: Value,
     ea: Option<EaInput>,
-    rs_input: f64,
-    ws: Value,
-    wz: Value,
-    z: Value,
-    latitude: Value,
-    day_of_year: Value,
+    rs_input: Option<Value>,
+    ws: Option<Value>,
+    wz: Option<Value>,
+    z: Option<Value>,
+    latitude: Option<Value>,
+    date: DateTime<Utc>,
 }
 
 impl Input {
     pub fn new(
-        tmax: Value,
-        tmin: Value,
-        ea: None,
-        rs_input: f64,
-        ws: Value,
-        wz: Value,
-        z: Value,
-        latitude: Value,
-        day_of_year: Value,
-    ) -> Input {
-        Input {
-            tmax,
-            tmin,
-            ea,
-            rs_input,
-            ws,
-            wz,
-            z,
-            latitude,
-            day_of_year,
+        tmax: f64,
+        tmin: f64,
+        units: &str,
+        date: &str
+    ) -> Result<Input, Box<dyn Error>> {
+        if tmin > tmax {
+            return Err("Invalid temperature input: tmax must be greater than or equal to tmin".into());
         }
+
+        let naive_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").map_err(|_| "Invalid date format, must be YYYY-MM-DD")?;
+        let naive_datetime = naive_date.and_hms_opt(0,0,0).unwrap();
+        let date : DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
+        
+        Ok(Input {
+            tmax: Value::new(tmax, units.to_string()),
+            tmin: Value::new(tmin, units.to_string()),
+            rs_input: None,
+            ea: None,
+            ws: None,
+            wz: None,
+            z: None,
+            latitude: None,
+            date,
+        })
+    }
+    
+    pub fn set_ea(&mut self, ea: EaInput) {
+        self.ea = Some(ea);
+    }
+    
+    // could return an error if the input is invalid
+    pub fn set_rs_input(&mut self, rs: f64, units: &str) -> Result<(), Box<dyn Error>> {
+        if rs > 0.0 && !units.is_empty() {
+            self.rs_input = Some(Value::new(rs, units.to_string()));
+            Ok(())
+        } else {
+            Err("Invalid radiation input".into())
+        }
+    }
+    
+    pub fn set_ws(&mut self, ws: f64, units: &str) -> Result<(), Box<dyn Error>> {
+        if ws > 0.0 && !units.is_empty() {
+            self.ws = Some(Value::new(ws, units.to_string()));
+            Ok(())
+        } else {
+            Err("Invalid wind speed input".into())
+        }
+    }
+    
+    pub fn set_wz(&mut self, wz: f64, units: &str) -> Result<(), Box<dyn Error>> {
+        if wz > 0.0 && !units.is_empty() {
+            self.wz = Some(Value::new(wz, units.to_string()));
+            Ok(())
+        } else {
+            Err("Invalid wind height input".into())
+        }
+    }
+    
+    pub fn set_z(&mut self, z: f64, units: &str) -> Result<(), Box<dyn Error>> {
+        if z > 0.0 &&!units.is_empty() {
+            self.z = Some(Value::new(z, units.to_string()));
+            Ok(())
+        } else {
+            Err("Invalid elevation input".into())
+        }
+    }
+    
+    pub fn set_latitude(&mut self, latitude: f64, units: &str) -> Result<(), Box<dyn Error>> {
+        if (-90.0..=90.0).contains(&latitude) && !units.is_empty() {
+            self.latitude = Some(Value::new(latitude, units.to_string()));
+            Ok(())
+        } else {
+            Err("Invalid latitude input".into())
+        }
+    }
+    
+    
+    pub fn set_date(&mut self, date: String) -> Result<(), Box<dyn Error>> {
+        // check to make sure format is yyyy-MM-dd
+        // parse the date and update day_of_year accordingly
+        // if parsing fails, return an error
+        let naive_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").map_err(|_| "Invalid date format, must be YYYY-MM-DD")?;
+        let naive_datetime = naive_date.and_hms_opt(0,0,0).unwrap();
+        self.date = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
+        Ok(())
     }
 
     pub fn get_tmax(&self) -> Result<f64, Box<dyn Error>> {
-        self.convert_temp()
+        self.tmax.convert_temp()
     }
 
     pub fn get_tmin(&self) -> Result<f64, Box<dyn Error>> {
-        self.convert_temp()
+        self.tmin.convert_temp()
     }
 
-    pub fn get_ea(&self) -> EaInput {
-        self.ea
+    pub fn get_ea(&self) -> Result<f64, Box<dyn Error>> {
+        if let Some(ea) = &self.ea {
+            ea.ea()
+        } else {
+            Err("Actual vapor pressure input is required".into())
+        }
     }
 
     pub fn get_rs_input(&self) -> Result<f64, Box<dyn Error>> {
-        self.convert_radiation()
+        if let Some(rs) = &self.rs_input {
+            rs.convert_radiation()
+        } else {
+            Err("Radiation input is required".into())
+        }
     }
 
     pub fn get_ws(&self) -> Result<f64, Box<dyn Error>> {
-        self.convert_speed()
+        if let Some(ws) = &self.ws {
+            ws.convert_speed()
+        } else {
+            Err("Wind speed input is required".into())
+        }
     }
 
     pub fn get_wz(&self) -> Result<f64, Box<dyn Error>> {
-        self.convert_z()
+        if let Some(wz) = &self.wz {
+            wz.convert_z()
+        } else {
+            Err("Wind z input is required".into())
+        }
     }
 
     pub fn get_z(&self) -> Result<f64, Box<dyn Error>> {
-        self.convert_z()
+        if let Some(z) = &self.z {
+            z.convert_z()
+        } else {
+            Err("Wind z input is required".into())
+        }
     }
 
-    pub fn get_latitude(&self) -> Value {
-        self.latitude
+    pub fn get_latitude(&self) -> Result<f64, Box<dyn Error>> {
+        if let Some(latitude) = &self.latitude {
+            latitude.convert_latitude()
+        } else {
+            Err("Latitude input is required".into())
+        }
     }
 
-    pub fn get_day_of_year(&self) -> Value {
-        self.day_of_year
+    pub fn get_date(&self) -> Result<DateTime<Utc>, Box<dyn Error>> {
+        Ok(self.date)
     }
 }
 
@@ -143,11 +232,6 @@ impl Value {
     pub fn convert_latitude(&self) -> Result<f64, Box<dyn Error>> {
         // convert latitude from degrees to radians
         let v = degrees_to_radians(self.value);
-        Ok(v)
-    }
-
-    pub fn convert_date_to_day_of_year(&self) -> Result<u32, Box<dyn Error>> {
-        let v = day_of_year(&self.value.to_string())?;
         Ok(v)
     }
 }

@@ -1,40 +1,24 @@
-#![allow(dead_code)]
-
 use std::f64::consts::{E, PI};
+use crate::conversions::day_of_year;
+use crate::input::Input;
 
 /// Calculates the short and tall referece et for a given set of conditions.
 ///
 /// # Arguments
 ///
-/// * `t_max` - The maximum temperature in degrees Celsius.
-/// * `t_min` - The minimum temperature in degrees Celsius.
-/// * `ea` - Actual vapor pressure
-/// * `rs` - Incoming solar radiation
-/// * `ws` - Wind speed at `wz` height in meters.
-/// * `wz` - Height in meters where the wind speed `ws` is measured.
-/// * `z` - The altitude in meters.
-/// * `latitude` - The latitude in degrees.
-/// * `doy` - Day of the year.
+/// * `Input` - The Input values for temperature, relative humidity, and air pressure.
 ///
 /// # Returns
 ///
 /// * a tuple containing the short and tall reference evapotranspiration.
 pub fn calculate_ref_et(
-    tmax: f64,
-    tmin: f64,
-    ea: f64,
-    rs_input: f64,
-    ws: f64,
-    wz: f64,
-    z: f64,
-    latitude: f64,
-    day_of_year: u32,
+    input: &Input
 ) -> (f64, f64) {
     const LAMDA: f64 = 0.408;
     const G: f64 = 0.0;
 
     // atmospheric pressure
-    let atmospheric_pressure = calc_atmospheric_pressure(z);
+    let atmospheric_pressure = calc_atmospheric_pressure(input.get_z().unwrap());
     // println!("Atmospheric pressure: {}", atmospheric_pressure);
 
     // psycometric constant
@@ -42,7 +26,7 @@ pub fn calculate_ref_et(
     // println!("Psycometric constant: {}", gamma);
 
     // mean temperature
-    let mean_temperature = mean_temp(tmax, tmin);
+    let mean_temperature = mean_temp(input.get_tmax().unwrap(), input.get_tmin().unwrap());
     // println!("Mean temperature: {}", mean_temperature);
 
     // slope of vapor pressure curve
@@ -50,21 +34,21 @@ pub fn calculate_ref_et(
     // println!("Slope of vapor pressure curve: {}", delta);
 
     // saturation vapor pressure
-    let saturation_vapor_pressure = es(tmax, tmin);
+    let saturation_vapor_pressure = es(input.get_tmax().unwrap(), input.get_tmin().unwrap());
     // println!("Saturation vapor pressure: {}", saturation_vapor_pressure);
 
     // extraterrestrial radiation
-    let extraterrestrial_radiation = calc_ra(latitude, day_of_year);
+    let extraterrestrial_radiation = calc_ra(input.get_latitude().unwrap(), day_of_year(&input.get_date().unwrap()).unwrap());
     // println!("Extraterrestrial radiation: {}", extraterrestrial_radiation);
 
     // clear sky radiation
-    let clear_sky_radiation = calc_rso(extraterrestrial_radiation, z);
+    let clear_sky_radiation = calc_rso(extraterrestrial_radiation, input.get_z().unwrap());
     // println!("Clear sky radiation: {}", clear_sky_radiation);
     
-    let mut rs = rs_input;
+    let mut rs = input.get_rs_input().unwrap();
     if rs == 0.0 {
         // use the Hargreaves - Samani Radiation Prediction Equation
-        rs = calculate_hargreaves_samani_rs(tmax, tmin, extraterrestrial_radiation);
+        rs = calculate_hargreaves_samani_rs(input.get_tmax().unwrap(), input.get_tmin().unwrap(), extraterrestrial_radiation);
         // limit rs to clear sky radiation
         if  rs > clear_sky_radiation {
             rs = clear_sky_radiation;
@@ -76,7 +60,7 @@ pub fn calculate_ref_et(
     // println!("Fraction of clear day: {}", fraction_of_clear_day);
 
     // long-wave radiation
-    let long_wave_radiation = calc_rnl(fraction_of_clear_day, ea, tmax, tmin);
+    let long_wave_radiation = calc_rnl(fraction_of_clear_day, input.get_ea().unwrap(), input.get_tmax().unwrap(), input.get_tmin().unwrap());
     // println!("Long-wave radiation: {}", long_wave_radiation);
 
     // short-wave radiation
@@ -86,14 +70,14 @@ pub fn calculate_ref_et(
     let net_radiation = calc_rn(short_wave_radiation, long_wave_radiation);
     // println!("Net radiation: {}", net_radiation);
 
-    let adjusted_wind_speed = calc_ws(ws, wz);
+    let adjusted_wind_speed = calc_ws(input.get_ws().unwrap(), input.get_wz().unwrap());
     // println!("Adjusted wind speed: {}", adjusted_wind_speed);
 
     let et_short_numerator = LAMDA * delta * (net_radiation - G)
         + gamma
             * (900.0 / (mean_temperature + 273.0))
             * adjusted_wind_speed
-            * (saturation_vapor_pressure - ea);
+            * (saturation_vapor_pressure - input.get_ea().unwrap());
     let et_short_denominator = delta + gamma * (1.0 + 0.34 * adjusted_wind_speed);
     // println!("ET short-term numerator: {}", et_short_numerator);
     // println!("ET short-term denominator: {}", et_short_denominator);
@@ -102,7 +86,7 @@ pub fn calculate_ref_et(
         + gamma
             * (1600.0 / (mean_temperature + 273.0))
             * adjusted_wind_speed
-            * (saturation_vapor_pressure - ea);
+            * (saturation_vapor_pressure - input.get_ea().unwrap());
     let et_tall_denominator = delta + gamma * (1.0 + 0.38 * adjusted_wind_speed);
     // println!("ET tall-term numerator: {}", et_tall_numerator);
     // println!("ET tall-term denominator: {}", et_tall_denominator);
@@ -122,15 +106,7 @@ pub fn calculate_ref_et(
 /// # Returns
 ///
 /// The atmospheric pressure in Pascals.
-///
-/// # Example
-///
-/// ```rust
-///     let altitude = 1000.0;
-///     let atmospheric_pressure = atmospheric_pressure(altitude);
-///     println!("The atmospheric pressure at {} meters is: {}", altitude, atmospheric_pressure);
-/// ```
-pub fn calc_atmospheric_pressure(z: f64) -> f64 {
+fn calc_atmospheric_pressure(z: f64) -> f64 {
     let mut calc_1 = (293.0 - 0.0065 * z) / 293.0;
     calc_1 = calc_1.powf(5.26);
     calc_1 * 101.3
@@ -145,15 +121,7 @@ pub fn calc_atmospheric_pressure(z: f64) -> f64 {
 /// # Returns
 ///
 /// The psychrometric constant in Pascals.
-///
-/// # Example
-///
-/// ```rust
-///     let atmospheric_pressure = 1013.25;
-///     let constant = psy_constant(atmospheric_pressure);
-///     println!("The psychrometric constant at {} Pascals is: {}", atmospheric_pressure, constant);
-/// ```
-pub fn psy_constant(atmospheric_pressure: f64) -> f64 {
+fn psy_constant(atmospheric_pressure: f64) -> f64 {
     atmospheric_pressure * 0.000665
 }
 
@@ -167,16 +135,7 @@ pub fn psy_constant(atmospheric_pressure: f64) -> f64 {
 /// # Returns
 ///
 /// The mean temperature in degrees Celsius.
-///
-/// # Example
-///
-/// ```rust
-///     let max_temp = 25.0;
-///     let min_temp = 15.0;
-///     let mean_temp_result = mean_temp(max_temp, min_temp);
-///     println!("The mean temperature is: {}", mean_temp_result);
-/// ```
-pub fn mean_temp(max_temp: f64, min_temp: f64) -> f64 {
+fn mean_temp(max_temp: f64, min_temp: f64) -> f64 {
     (max_temp + min_temp) / 2.0
 }
 
@@ -189,15 +148,7 @@ pub fn mean_temp(max_temp: f64, min_temp: f64) -> f64 {
 /// # Returns
 ///
 /// The slope of the vapor pressure curve at the given mean temperature.
-///
-/// # Example
-///
-/// ```rust
-///     let tmean = 25.0;
-///     let delta_result = es_slope(tmean);
-///     println!("The slope of the vapor pressure curve at {} degrees Celsius is: {}", tmean, delta_result);
-/// ```
-pub fn es_slope(tmean: f64) -> f64 {
+fn es_slope(tmean: f64) -> f64 {
     let e = (17.27 * tmean) / (tmean + 237.3);
     let num = 2503.0 * e.exp();
     let denom = (tmean + 237.3).powi(2);
@@ -215,20 +166,11 @@ pub fn es_slope(tmean: f64) -> f64 {
 /// # Returns
 ///
 /// The daily Saturation Vapor Pressure at the given maximum and minimum temperatures.
-///
-/// # Example
-///
-/// ```rust
-///     let max_temp = 25.0;
-///     let min_temp = 15.0;
-///     let es_result = es(max_temp, min_temp);
-///     println!("The daily Saturation Vapor Pressure is: {}", es_result);
-/// ```
-///
+/// 
 /// # Panics
 ///
 /// This function will panic if the provided temperatures are not valid.
-pub fn es(max_temp: f64, min_temp: f64) -> f64 {
+fn es(max_temp: f64, min_temp: f64) -> f64 {
     (eo(max_temp) + eo(min_temp)) / 2.0
 }
 
@@ -244,18 +186,10 @@ pub fn es(max_temp: f64, min_temp: f64) -> f64 {
 ///
 /// The saturation vapor pressure at the given temperature.
 ///
-/// # Example
-///
-/// ```rust
-///     let temp = 25.0;
-///     let es_result = eo(temp);
-///     println!("The saturation vapor pressure at {} degrees Celsius is: {}", temp, es_result);
-/// ```
-///
 /// # Panics
 ///
 /// This function will panic if the provided temperature is not valid.
-pub fn eo(temp: f64) -> f64 {
+fn eo(temp: f64) -> f64 {
     0.6108 * E.powf((17.27 * temp) / (temp + 237.3))
 }
 
@@ -347,26 +281,10 @@ fn calc_rso(ra: f64, z: f64) -> f64 {
 /// # Returns
 ///
 /// The fraction of clear day (FCD).
-///
-/// # Example
-///
-/// ```rust
-///     let rso = 1000.0;
-///     let rs = 1200.0;
-///     let fcd_result = calc_fcd(rso, rs);
-///     println!("The fraction of clear day is: {}", fcd_result);
-/// ```
 pub fn calc_fcd(rso: f64, rs: f64) -> f64 {
     let mut relative_solar_radiation = rs / rso;
 
-    if relative_solar_radiation < 0.3 {
-        relative_solar_radiation = 0.3;
-    }
-
-    if relative_solar_radiation > 1.0 {
-        relative_solar_radiation = 1.0;
-    }
-    
+    relative_solar_radiation = relative_solar_radiation.clamp(0.3, 1.0);
     relative_solar_radiation * 1.35 - 0.35
 }
 
@@ -398,14 +316,6 @@ fn calc_rnl(fcd: f64, ea: f64, tmax: f64, tmin: f64) -> f64 {
 /// # Returns
 ///
 /// Net solar radiation after accounting for albedo.
-///
-/// # Example
-///
-/// ```
-/// let rs = 300.0;
-/// let rns = calc_rns(rs);
-/// println!("Net solar radiation: {}", rns);
-/// ```
 fn calc_rns(rs: f64) -> f64 {
     const ALPHA: f64 = 0.23;
     (1.0 - ALPHA) * rs
