@@ -1,6 +1,7 @@
-use std::f64::consts::{E, PI};
 use crate::conversions::day_of_year;
-use crate::input::Input;
+use crate::EaInput;
+use climate::output::Output;
+use std::f64::consts::{E, PI};
 
 /// Calculates the short and tall referece et for a given set of conditions.
 ///
@@ -12,13 +13,14 @@ use crate::input::Input;
 ///
 /// * a tuple containing the short and tall reference evapotranspiration.
 pub fn calculate_ref_et(
-    input: &Input
+    input: &Output
 ) -> (f64, f64) {
     const LAMDA: f64 = 0.408;
     const G: f64 = 0.0;
+    let eta = EaInput::new_from_output(input);  // Creates a EaInput from the Input values, chooses the proper method based on the input data.
 
     // atmospheric pressure
-    let atmospheric_pressure = calc_atmospheric_pressure(input.get_z().unwrap());
+    let atmospheric_pressure = calc_atmospheric_pressure(input.get_z());
     // println!("Atmospheric pressure: {}", atmospheric_pressure);
 
     // psycometric constant
@@ -26,7 +28,7 @@ pub fn calculate_ref_et(
     // println!("Psycometric constant: {}", gamma);
 
     // mean temperature
-    let mean_temperature = mean_temp(input.get_tmax().unwrap(), input.get_tmin().unwrap());
+    let mean_temperature = mean_temp(input.get_tmax(), input.get_tmin());
     // println!("Mean temperature: {}", mean_temperature);
 
     // slope of vapor pressure curve
@@ -34,33 +36,38 @@ pub fn calculate_ref_et(
     // println!("Slope of vapor pressure curve: {}", delta);
 
     // saturation vapor pressure
-    let saturation_vapor_pressure = es(input.get_tmax().unwrap(), input.get_tmin().unwrap());
+    let saturation_vapor_pressure = es(input.get_tmax(), input.get_tmin());
     // println!("Saturation vapor pressure: {}", saturation_vapor_pressure);
 
     // extraterrestrial radiation
-    let extraterrestrial_radiation = calc_ra(input.get_latitude().unwrap(), day_of_year(&input.get_date().unwrap()).unwrap());
+    let extraterrestrial_radiation = calc_ra(input.get_latitude(), day_of_year(&input.get_date()).unwrap());
+    // println!("Latitude: {}", input.get_latitude());
+    // println!("Day of Year: {}", day_of_year(&input.get_date()).unwrap());
     // println!("Extraterrestrial radiation: {}", extraterrestrial_radiation);
 
     // clear sky radiation
-    let clear_sky_radiation = calc_rso(extraterrestrial_radiation, input.get_z().unwrap());
+    let clear_sky_radiation = calc_rso(extraterrestrial_radiation, input.get_z());
     // println!("Clear sky radiation: {}", clear_sky_radiation);
-    
-    let mut rs = input.get_rs_input().unwrap();
-    if rs == 0.0 {
-        // use the Hargreaves - Samani Radiation Prediction Equation
-        rs = calculate_hargreaves_samani_rs(input.get_tmax().unwrap(), input.get_tmin().unwrap(), extraterrestrial_radiation);
+
+    let rs: f64;
+    if let Some(mut rs_value) = input.get_rs() {
+        rs = rs_value;
+    } else {
+        let harg_rs = calculate_hargreaves_samani_rs(input.get_tmax(), input.get_tmin(), extraterrestrial_radiation);
         // limit rs to clear sky radiation
-        if  rs > clear_sky_radiation {
+        if harg_rs > clear_sky_radiation {
             rs = clear_sky_radiation;
+        } else {
+            rs = harg_rs;
         }
-    }
+    };
 
     // fraction of clear day
     let fraction_of_clear_day = calc_fcd(clear_sky_radiation, rs);
     // println!("Fraction of clear day: {}", fraction_of_clear_day);
 
     // long-wave radiation
-    let long_wave_radiation = calc_rnl(fraction_of_clear_day, input.get_ea().unwrap(), input.get_tmax().unwrap(), input.get_tmin().unwrap());
+    let long_wave_radiation = calc_rnl(fraction_of_clear_day, eta.ea().unwrap(), input.get_tmax(), input.get_tmin());
     // println!("Long-wave radiation: {}", long_wave_radiation);
 
     // short-wave radiation
@@ -70,23 +77,23 @@ pub fn calculate_ref_et(
     let net_radiation = calc_rn(short_wave_radiation, long_wave_radiation);
     // println!("Net radiation: {}", net_radiation);
 
-    let adjusted_wind_speed = calc_ws(input.get_ws().unwrap(), input.get_wz().unwrap());
+    let adjusted_wind_speed = calc_ws(input.get_ws().unwrap(), input.get_wz());
     // println!("Adjusted wind speed: {}", adjusted_wind_speed);
 
     let et_short_numerator = LAMDA * delta * (net_radiation - G)
         + gamma
-            * (900.0 / (mean_temperature + 273.0))
-            * adjusted_wind_speed
-            * (saturation_vapor_pressure - input.get_ea().unwrap());
+        * (900.0 / (mean_temperature + 273.0))
+        * adjusted_wind_speed
+        * (saturation_vapor_pressure - input.get_ea().unwrap());
     let et_short_denominator = delta + gamma * (1.0 + 0.34 * adjusted_wind_speed);
     // println!("ET short-term numerator: {}", et_short_numerator);
     // println!("ET short-term denominator: {}", et_short_denominator);
 
     let et_tall_numerator = LAMDA * delta * (net_radiation - G)
         + gamma
-            * (1600.0 / (mean_temperature + 273.0))
-            * adjusted_wind_speed
-            * (saturation_vapor_pressure - input.get_ea().unwrap());
+        * (1600.0 / (mean_temperature + 273.0))
+        * adjusted_wind_speed
+        * (saturation_vapor_pressure - input.get_ea().unwrap());
     let et_tall_denominator = delta + gamma * (1.0 + 0.38 * adjusted_wind_speed);
     // println!("ET tall-term numerator: {}", et_tall_numerator);
     // println!("ET tall-term denominator: {}", et_tall_denominator);
@@ -166,7 +173,7 @@ fn es_slope(tmean: f64) -> f64 {
 /// # Returns
 ///
 /// The daily Saturation Vapor Pressure at the given maximum and minimum temperatures.
-/// 
+///
 /// # Panics
 ///
 /// This function will panic if the provided temperatures are not valid.
@@ -244,9 +251,11 @@ fn sunset_hour_angle(lat: f64, delta: f64) -> f64 {
 ///
 /// * The Extraterrestrial Radiation for 24-Hour Periods.
 fn calc_ra(latitude: f64, doy: u32) -> f64 {
+    println!("Latitude: {}, DOY: {}", latitude, doy);
     let dr = inverse_rel_dist_factor(doy);
     let delta = solar_declin(doy);
     let omega = sunset_hour_angle(latitude, delta);
+    println!("Dr: {}, delta: {}, omega: {}", dr, delta, omega);
 
     24.0 / PI
         * 4.92
@@ -362,7 +371,7 @@ fn calculate_hargreaves_samani_rs(tmax: f64, tmin: f64, ra: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_atmospheric_pressure_greeley() {
         // Given
@@ -374,7 +383,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((atmospheric_pressure - 85.1666).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_psy_constant() {
         //Given
@@ -386,7 +395,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((psy_constant - 0.056635).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_mean_temperature() {
         // Given
@@ -399,7 +408,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((mean_temperature - 21.65).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_es_slope() {
         // Given
@@ -411,7 +420,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((es_slope - 0.1585).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_eo_max_temperature() {
         // Given
@@ -434,7 +443,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((eo - 1.30401).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_calculate_ws() {
         // Given
@@ -447,7 +456,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((calculated_ws - 1.786).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_inverse_rel_dist_factor() {
         // Given
@@ -459,7 +468,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((inverse_rel_dist_factor - 0.967).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_solar_declin() {
         // Given
@@ -471,7 +480,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((solar_declin - 0.4017).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_sunset_hour_angle() {
         // Given
@@ -484,7 +493,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((sunset_hour_angle - 1.941).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_calculate_ra() {
         // Given
@@ -497,7 +506,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((ra - 41.626).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_calculate_rso() {
         // Given
@@ -510,7 +519,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((rso - 32.44).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_calculate_fcd() {
         // Given
@@ -523,7 +532,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((fcd - 0.5822).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_calculate_rnl() {
         // Given
@@ -538,7 +547,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((rnl - 3.96).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_calculate_rns() {
         // Given
@@ -550,7 +559,7 @@ mod tests {
         // greeley level based on the ASCE Standardized manual
         assert!((rns - 17.247).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_calculate_rn() {
         // Given
