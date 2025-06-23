@@ -12,12 +12,10 @@ use std::f64::consts::{E, PI};
 /// # Returns
 ///
 /// * a tuple containing the short and tall reference evapotranspiration.
-pub fn calculate_ref_et(
-    input: &Output
-) -> (f64, f64) {
+pub fn calculate_ref_et(input: &Output) -> (f64, f64) {
     const LAMDA: f64 = 0.408;
     const G: f64 = 0.0;
-    let eta = EaInput::new_from_output(input);  // Creates a EaInput from the Input values, chooses the proper method based on the input data.
+    let eta = EaInput::new_from_output(input); // Creates a EaInput from the Input values, chooses the proper method based on the input data.
 
     // atmospheric pressure
     let atmospheric_pressure = calc_atmospheric_pressure(input.get_z());
@@ -40,7 +38,10 @@ pub fn calculate_ref_et(
     // println!("Saturation vapor pressure: {}", saturation_vapor_pressure);
 
     // extraterrestrial radiation
-    let extraterrestrial_radiation = calc_ra(input.get_latitude(), day_of_year(&input.get_date()).unwrap());
+    let extraterrestrial_radiation = calc_ra(
+        input.get_latitude(),
+        day_of_year(&input.get_date()).unwrap(),
+    );
     // println!("Latitude: {}", input.get_latitude());
     // println!("Day of Year: {}", day_of_year(&input.get_date()).unwrap());
     // println!("Extraterrestrial radiation: {}", extraterrestrial_radiation);
@@ -50,10 +51,14 @@ pub fn calculate_ref_et(
     // println!("Clear sky radiation: {}", clear_sky_radiation);
 
     let rs: f64;
-    if let Some(mut rs_value) = input.get_rs() {
+    if let Some(rs_value) = input.get_rs() {
         rs = rs_value;
     } else {
-        let harg_rs = calculate_hargreaves_samani_rs(input.get_tmax(), input.get_tmin(), extraterrestrial_radiation);
+        let harg_rs = calculate_hargreaves_samani_rs(
+            input.get_tmax(),
+            input.get_tmin(),
+            extraterrestrial_radiation,
+        );
         // limit rs to clear sky radiation
         if harg_rs > clear_sky_radiation {
             rs = clear_sky_radiation;
@@ -67,7 +72,12 @@ pub fn calculate_ref_et(
     // println!("Fraction of clear day: {}", fraction_of_clear_day);
 
     // long-wave radiation
-    let long_wave_radiation = calc_rnl(fraction_of_clear_day, eta.ea().unwrap(), input.get_tmax(), input.get_tmin());
+    let long_wave_radiation = calc_rnl(
+        fraction_of_clear_day,
+        eta.ea().unwrap(),
+        input.get_tmax(),
+        input.get_tmin(),
+    );
     // println!("Long-wave radiation: {}", long_wave_radiation);
 
     // short-wave radiation
@@ -82,18 +92,18 @@ pub fn calculate_ref_et(
 
     let et_short_numerator = LAMDA * delta * (net_radiation - G)
         + gamma
-        * (900.0 / (mean_temperature + 273.0))
-        * adjusted_wind_speed
-        * (saturation_vapor_pressure - input.get_ea().unwrap());
+            * (900.0 / (mean_temperature + 273.0))
+            * adjusted_wind_speed
+            * (saturation_vapor_pressure - input.get_ea().unwrap());
     let et_short_denominator = delta + gamma * (1.0 + 0.34 * adjusted_wind_speed);
     // println!("ET short-term numerator: {}", et_short_numerator);
     // println!("ET short-term denominator: {}", et_short_denominator);
 
     let et_tall_numerator = LAMDA * delta * (net_radiation - G)
         + gamma
-        * (1600.0 / (mean_temperature + 273.0))
-        * adjusted_wind_speed
-        * (saturation_vapor_pressure - input.get_ea().unwrap());
+            * (1600.0 / (mean_temperature + 273.0))
+            * adjusted_wind_speed
+            * (saturation_vapor_pressure - input.get_ea().unwrap());
     let et_tall_denominator = delta + gamma * (1.0 + 0.38 * adjusted_wind_speed);
     // println!("ET tall-term numerator: {}", et_tall_numerator);
     // println!("ET tall-term denominator: {}", et_tall_denominator);
@@ -260,7 +270,8 @@ fn calc_ra(latitude: f64, doy: u32) -> f64 {
     24.0 / PI
         * 4.92
         * dr
-        * (omega * latitude.sin() * delta.sin() + latitude.cos() * delta.cos() * omega.sin()) // Eq. 21
+        * (omega * latitude.sin() * delta.sin() + latitude.cos() * delta.cos() * omega.sin())
+    // Eq. 21
 }
 
 /// Calculates the clear-sky solar radiation. Found in equation 19.
