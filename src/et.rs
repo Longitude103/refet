@@ -87,7 +87,7 @@ pub fn calculate_ref_et(input: &Output) -> (f64, f64) {
     let net_radiation = calc_rn(short_wave_radiation, long_wave_radiation);
     // println!("Net radiation: {}", net_radiation);
 
-    let adjusted_wind_speed = calc_ws(input.get_ws().unwrap(), input.get_wz());
+    let adjusted_wind_speed = calc_ws(input.get_ws().unwrap_or(0.0), input.get_wz());
     // println!("Adjusted wind speed: {}", adjusted_wind_speed);
 
     let et_short_numerator = LAMDA * delta * (net_radiation - G)
