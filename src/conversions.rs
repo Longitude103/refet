@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Utc};
+use chrono::{Datelike, NaiveDate};
 
 // pub fn c_to_f(value: f64) -> f64 {
 //     // conversion of Celsius to Fahrenheit
@@ -65,7 +65,7 @@ use chrono::{DateTime, Datelike, Utc};
 ///   - Ok(u32): the day of the year as a u32 if the input date is valid.
 ///   - Err(String): an error string indicating what went wrong (e.g., invalid date format).
 ///
-pub fn day_of_year(date: &DateTime<Utc>) -> Result<u32, String> {
+pub fn day_of_year(date: &NaiveDate) -> Result<u32, String> {
     // Get the day of the year
     Ok(date.ordinal())
 }
@@ -73,23 +73,21 @@ pub fn day_of_year(date: &DateTime<Utc>) -> Result<u32, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{DateTime, NaiveDate, Utc};
+    use chrono::Utc;
 
     #[test]
     fn test_day_of_year() {
-        let naive_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
-        let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
-        let day_of_year =
-            day_of_year(&DateTime::from_naive_utc_and_offset(naive_datetime, Utc)).unwrap();
+        // let naive_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+        // let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
+        let day_of_year = day_of_year(&Utc::now().date_naive()).unwrap();
         assert_eq!(day_of_year, 1);
     }
 
     #[test]
     fn test_day_of_year_leap_year() {
-        let naive_date = NaiveDate::from_ymd_opt(2020, 2, 29).unwrap();
-        let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
-        let day_of_year =
-            day_of_year(&DateTime::from_naive_utc_and_offset(naive_datetime, Utc)).unwrap();
+        // let naive_date = NaiveDate::from_ymd_opt(2020, 2, 29).unwrap();
+        // let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
+        let day_of_year = day_of_year(&Utc::now().date_naive()).unwrap();
         assert_eq!(day_of_year, 60);
     }
 

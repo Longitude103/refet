@@ -8,13 +8,13 @@ pub use eta::{EaInput, Method};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{DateTime, NaiveDate, Utc};
+    use chrono::Utc;
     use climate::output::Output;
 
     #[test]
     fn test_calculate_ref_et() {
-        let naive_date = NaiveDate::from_ymd_opt(2000, 7, 1).unwrap();
-        let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
+        // let naive_date = NaiveDate::from_ymd_opt(2000, 7, 1).unwrap();
+        // let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
         let output = Output::new_with_values(
             32.4,
             10.9,
@@ -27,7 +27,7 @@ mod tests {
             Some(3.0),
             1462.4,
             40.41_f64.to_radians(),
-            DateTime::from_naive_utc_and_offset(naive_datetime, Utc),
+            Utc::now().date_naive(),
         );
         let (short_et, tall_et) = calculate_ref_et(&output);
 

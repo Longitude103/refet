@@ -15,7 +15,7 @@ use std::f64::consts::{E, PI};
 pub fn calculate_ref_et(input: &Output) -> (f64, f64) {
     const LAMDA: f64 = 0.408;
     const G: f64 = 0.0;
-    let eta = EaInput::new_from_output(input); // Creates a EaInput from the Input values, chooses the proper method based on the input data.
+    let eta = EaInput::new_from_output(input); // Creates an EaInput from the Input values, chooses the proper method based on the input data.
 
     // atmospheric pressure
     let atmospheric_pressure = calc_atmospheric_pressure(input.get_z());
@@ -247,7 +247,7 @@ fn solar_declin(doy: u32) -> f64 {
 ///
 /// * The sunset hour angle.
 fn sunset_hour_angle(lat: f64, delta: f64) -> f64 {
-    (-1.0 * lat.tan() * delta.tan()).acos() // Eq. 27
+    (-lat.tan() * delta.tan()).acos() // Eq. 27
 }
 
 /// Calculates the Extraterrestrial Radiation for 24-Hour Periods. Found in equation 21.
@@ -261,11 +261,11 @@ fn sunset_hour_angle(lat: f64, delta: f64) -> f64 {
 ///
 /// * The Extraterrestrial Radiation for 24-Hour Periods.
 fn calc_ra(latitude: f64, doy: u32) -> f64 {
-    println!("Latitude: {}, DOY: {}", latitude, doy);
+    // println!("Latitude: {latitude}, DOY: {doy}");
     let dr = inverse_rel_dist_factor(doy);
     let delta = solar_declin(doy);
     let omega = sunset_hour_angle(latitude, delta);
-    println!("Dr: {}, delta: {}, omega: {}", dr, delta, omega);
+    // println!("Dr: {dr}, delta: {delta}, omega: {omega}");
 
     24.0 / PI
         * 4.92

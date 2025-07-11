@@ -21,18 +21,16 @@ pub enum Method {
 // DailyMinRelativeHumidity - daily minimum relative humidity (put in Value, add Tmax)
 // DailyMinAirTemperature - daily minimum air temperature (put in Value, add Tmin)
 pub struct EaInput {
-    input: Option<f64>,  // Ea in kPa or Dewpoint in Celsius otherwise None
-    method: Method, // method to calculate Ea from Method enum
+    input: Option<f64>, // Ea in kPa or Dewpoint in Celsius otherwise None
+    method: Method,     // method to calculate Ea from Method enum
     rhmax: Option<f64>, // daily maximum relative humidity in %
-    rhmin: Option<f64>,  // daily minimum relative humidity in %
+    rhmin: Option<f64>, // daily minimum relative humidity in %
     tmax: Option<f64>,  // daily maximum air temperature in Celsius
     tmin: Option<f64>,  // daily minimum air temperature in Celsius
 }
 
 impl EaInput {
-    pub fn new_empty(
-        method: Method,
-    ) -> EaInput {
+    pub fn new_empty(method: Method) -> EaInput {
         EaInput {
             input: None,
             method,
@@ -50,7 +48,14 @@ impl EaInput {
         } else if output.get_dewpoint().is_some() {
             EaInput::new_dewpoint(output.get_dewpoint().unwrap(), "C")
         } else if output.get_rhmin().is_some() && output.get_rhmax().is_some() {
-            EaInput::new_rhmax_min(output.get_rhmax().unwrap(), output.get_rhmin().unwrap(), "C", output.get_tmax(), output.get_tmin(), "C")
+            EaInput::new_rhmax_min(
+                output.get_rhmax().unwrap(),
+                output.get_rhmin().unwrap(),
+                "C",
+                output.get_tmax(),
+                output.get_tmin(),
+                "C",
+            )
         } else if output.get_rhmax().is_some() {
             EaInput::new_rhmax(output.get_rhmax().unwrap(), "C", output.get_tmax(), "C")
         } else if output.get_rhmin().is_some() {
@@ -65,7 +70,11 @@ impl EaInput {
         if let Ok(unit) = Units::from_abbreviation(units) {
             match unit {
                 Units::KiloPascals => direct_value = input,
-                Units::Pascals => direct_value = Units::Pascals.convert(input, &Units::KiloPascals).expect("Units conversion failed"),
+                Units::Pascals => {
+                    direct_value = Units::Pascals
+                        .convert(input, &Units::KiloPascals)
+                        .expect("Units conversion failed")
+                }
                 _ => panic!("Invalid units for EA Direct: {}", units),
             }
         } else {
@@ -87,7 +96,11 @@ impl EaInput {
         if let Ok(unit) = Units::from_abbreviation(units) {
             match unit {
                 Units::Celsius => direct_value = tdew,
-                Units::Fahrenheit => direct_value = Units::Fahrenheit.convert(tdew, &Units::Celsius).expect("Units conversion failed"),
+                Units::Fahrenheit => {
+                    direct_value = Units::Fahrenheit
+                        .convert(tdew, &Units::Celsius)
+                        .expect("Units conversion failed")
+                }
                 _ => panic!("Invalid units for dewpoint: {}", units),
             }
         } else {
@@ -104,7 +117,14 @@ impl EaInput {
         }
     }
 
-    pub fn new_rhmax_min(rhmax: f64, rhmin: f64, rh_units: &str, tmax: f64, tmin: f64, temp_units: &str) -> EaInput {
+    pub fn new_rhmax_min(
+        rhmax: f64,
+        rhmin: f64,
+        rh_units: &str,
+        tmax: f64,
+        tmin: f64,
+        temp_units: &str,
+    ) -> EaInput {
         let mut ea_input = EaInput::new_empty(Method::MaxMinRelativeHumidity);
         Units::from_abbreviation(rh_units).expect("Invalid units for relative humidity");
         ea_input.rhmax = Some(rhmax);
@@ -117,8 +137,16 @@ impl EaInput {
                 ea_input.tmin = Some(tmin);
             }
             Units::Fahrenheit => {
-                ea_input.tmax = Some(Units::Fahrenheit.convert(tmax, &Units::Celsius).expect("Units conversion failed"));
-                ea_input.tmin = Some(Units::Fahrenheit.convert(tmin, &Units::Celsius).expect("Units conversion failed"));
+                ea_input.tmax = Some(
+                    Units::Fahrenheit
+                        .convert(tmax, &Units::Celsius)
+                        .expect("Units conversion failed"),
+                );
+                ea_input.tmin = Some(
+                    Units::Fahrenheit
+                        .convert(tmin, &Units::Celsius)
+                        .expect("Units conversion failed"),
+                );
             }
             _ => panic!("Invalid units for temperature"),
         }
@@ -137,7 +165,11 @@ impl EaInput {
                 ea_input.tmax = Some(tmax);
             }
             Units::Fahrenheit => {
-                ea_input.tmax = Some(Units::Fahrenheit.convert(tmax, &Units::Celsius).expect("Units conversion failed"));
+                ea_input.tmax = Some(
+                    Units::Fahrenheit
+                        .convert(tmax, &Units::Celsius)
+                        .expect("Units conversion failed"),
+                );
             }
             _ => panic!("Invalid units for temperature"),
         }
@@ -156,7 +188,11 @@ impl EaInput {
                 ea_input.tmin = Some(tmin);
             }
             Units::Fahrenheit => {
-                ea_input.tmax = Some(Units::Fahrenheit.convert(tmin, &Units::Celsius).expect("Units conversion failed"));
+                ea_input.tmax = Some(
+                    Units::Fahrenheit
+                        .convert(tmin, &Units::Celsius)
+                        .expect("Units conversion failed"),
+                );
             }
             _ => panic!("Invalid units for temperature"),
         }
@@ -169,7 +205,11 @@ impl EaInput {
         if let Ok(unit) = Units::from_abbreviation(units) {
             match unit {
                 Units::Celsius => tmin_value = tmin,
-                Units::Fahrenheit => tmin_value = Units::Fahrenheit.convert(tmin, &Units::Celsius).expect("Units conversion failed"),
+                Units::Fahrenheit => {
+                    tmin_value = Units::Fahrenheit
+                        .convert(tmin, &Units::Celsius)
+                        .expect("Units conversion failed")
+                }
                 _ => panic!("Invalid units for tmin: {}", units),
             }
         } else {
@@ -182,7 +222,7 @@ impl EaInput {
             rhmax: None,
             rhmin: None,
             tmax: None,
-            tmin: Some(tmin_value),
+            tmin: Some(tmin_value), // Use the converted value here
         }
     }
 
